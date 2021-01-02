@@ -28,6 +28,7 @@ fn main() -> Result<()> {
         .sender_winit(proxy)
         .icon_from_buffer(green)
         .tooltip("Enabled")
+        .menu(MenuBuilder::new().item("Exit", Events::Exit))
         .on_double_click(Events::DoubleClickTrayIcon)
         .build()
         .unwrap();
