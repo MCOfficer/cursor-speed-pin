@@ -11,3 +11,5 @@ winapi = { version = "0.3", features = ["winuser", "winerror", "shellapi", "impl
 anyhow = "1.0"
 winit = "0.22"
 trayicon = { version = "0.1.0-beta.18", features = ["winit"] }
+log = "0.4"
+simplelog = "0.9"

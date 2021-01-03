@@ -1,4 +1,7 @@
 use anyhow::Result;
+use log::{error, info, LevelFilter};
+use simplelog::*;
+use std::fs::File;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use trayicon::{Icon, MenuBuilder, TrayIcon, TrayIconBuilder};
 use winit::{
@@ -16,6 +19,20 @@ static ENABLED: AtomicBool = AtomicBool::new(true);
 static DESIRED_SPEED: AtomicU8 = AtomicU8::new(0);
 
 fn main() -> Result<()> {
+    let mut logfile = std::env::current_exe().unwrap();
+    logfile = logfile.parent().unwrap().to_path_buf();
+    logfile.push("cursor-speed-pin.log");
+    CombinedLogger::init(vec![
+        TermLogger::new(LevelFilter::Debug, Config::default(), TerminalMode::Mixed),
+        WriteLogger::new(
+            LevelFilter::Debug,
+            Config::default(),
+            File::create(logfile).unwrap(),
+        ),
+    ])
+    .unwrap();
+    info!("Initialized logger");
+
     let event_loop = EventLoop::<Events>::with_user_event();
     let proxy = event_loop.create_proxy();
 
@@ -26,31 +43,50 @@ fn main() -> Result<()> {
 
     let mut tray_icon = TrayIconBuilder::new()
         .sender_winit(proxy)
-        .icon_from_buffer(green)
-        .tooltip("Enabled")
+        .icon_from_buffer(red)
+        .tooltip("Disabled")
         .menu(MenuBuilder::new().item("Exit", Events::Exit))
         .on_double_click(Events::DoubleClickTrayIcon)
         .build()
         .unwrap();
 
-    DESIRED_SPEED.store(winapi::get_mouse_speed()?, Ordering::SeqCst);
-    update_status(&mut tray_icon, &green_icon, &red_icon);
+    info!("Initialized tray icon");
+    info!("Fetching initial mouse speed");
+    match winapi::get_mouse_speed() {
+        Some(speed) => {
+            DESIRED_SPEED.store(speed, Ordering::SeqCst);
+            info!("Initial status update");
+            update_status(&mut tray_icon, &green_icon, &red_icon);
+        }
+        None => {
+            info!("No initial mouse speed, disabling");
+            ENABLED.store(false, Ordering::SeqCst);
+        }
+    }
 
-    std::thread::spawn(|| loop {
-        std::thread::sleep(std::time::Duration::from_millis(50));
-        if ENABLED.load(Ordering::Relaxed) {
-            let current = winapi::get_mouse_speed().unwrap();
-            let desired = DESIRED_SPEED.load(Ordering::Relaxed);
-            if desired != current {
-                winapi::notify(format!(
-                    "Speed was set to {}, resetting to desired speed {}",
-                    current, desired
-                ));
-                winapi::set_mouse_speed(desired).unwrap();
+    info!("Spawning speed checking thread");
+    std::thread::spawn(|| {
+        info!("Speed checking thread running");
+
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            if ENABLED.load(Ordering::Relaxed) {
+                if let Some(current) = winapi::get_mouse_speed() {
+                    let desired = DESIRED_SPEED.load(Ordering::Relaxed);
+                    if desired != current {
+                        info!("Found speed of {}, resetting to {}", current, desired);
+                        winapi::notify(format!(
+                            "Speed was set to {}, resetting to desired speed {}",
+                            current, desired
+                        ));
+                        winapi::set_mouse_speed(desired).unwrap();
+                    }
+                }
             }
         }
     });
 
+    info!("Starting winit event loop");
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
@@ -59,10 +95,23 @@ fn main() -> Result<()> {
                 Events::Exit => *control_flow = ControlFlow::Exit,
                 Events::DoubleClickTrayIcon => {
                     if ENABLED.load(Ordering::Relaxed) {
+                        info!("Disabling");
                         ENABLED.store(false, Ordering::SeqCst);
                     } else {
-                        DESIRED_SPEED.store(winapi::get_mouse_speed().unwrap(), Ordering::SeqCst);
-                        ENABLED.store(true, Ordering::SeqCst);
+                        match winapi::get_mouse_speed() {
+                            Some(speed) => {
+                                info!("Enabling with speed {}", speed);
+                                DESIRED_SPEED.store(speed, Ordering::SeqCst);
+                                ENABLED.store(true, Ordering::SeqCst);
+                            }
+                            None => {
+                                winapi::notify(
+                                    "Failed to get current cursor speed, see the logfile for more."
+                                        .to_string(),
+                                );
+                                return;
+                            }
+                        };
                     }
                     update_status(&mut tray_icon, &green_icon, &red_icon);
                 }
@@ -75,26 +124,39 @@ fn update_status<T>(tray_icon: &mut TrayIcon<T>, green: &Icon, red: &Icon)
 where
     T: PartialEq + Clone + 'static,
 {
-    if ENABLED.load(Ordering::Relaxed) {
-        winapi::notify(format!(
-            "Pinning cursor speed of {}",
-            DESIRED_SPEED.load(Ordering::Relaxed)
-        ));
-        tray_icon.set_tooltip(&format!(
-            "Enabled, Speed: {}",
-            DESIRED_SPEED.load(Ordering::Relaxed)
-        ));
-        tray_icon.set_icon(green);
+    let enabled = ENABLED.load(Ordering::Relaxed);
+    let (notification, tooltip, icon) = if enabled {
+        (
+            format!(
+                "Pinning cursor speed of {}",
+                DESIRED_SPEED.load(Ordering::Relaxed)
+            ),
+            format!("Enabled, Speed: {}", DESIRED_SPEED.load(Ordering::Relaxed)),
+            green,
+        )
     } else {
-        winapi::notify("Unpinned cursor speed".to_string());
-        tray_icon.set_tooltip("Disabled");
-        tray_icon.set_icon(red);
-    }
+        (
+            "Unpinned cursor speed".to_string(),
+            "Disabled".to_string(),
+            red,
+        )
+    };
+
+    winapi::notify(notification);
+
+    if let Err(e) = tray_icon.set_tooltip(&tooltip) {
+        error!("Failed to set tray tooltip to {}: {:#?}", tooltip, e);
+    };
+
+    if let Err(e) = tray_icon.set_icon(icon) {
+        error!("Failed to set tray icon: {:#?}", e);
+    };
 }
 
 mod winapi {
     use anyhow::anyhow;
     use anyhow::Result;
+    use log::{error, info};
     use std::os::windows::ffi::OsStrExt;
     use winapi::_core::borrow::BorrowMut;
     use winapi::shared::guiddef::GUID;
@@ -124,62 +186,76 @@ mod winapi {
         }};
     }
 
-    fn generate_guid() -> Result<GUID, i32> {
+    fn generate_guid() -> Option<GUID> {
         unsafe {
             let mut gen_guid: GUID = Default::default();
             let result = CoCreateGuid(&mut gen_guid);
             if result == winerror::S_OK {
-                Ok(gen_guid)
+                Some(gen_guid)
             } else {
-                Err(result)
+                error!("Failed to create GUID, return code was {}", result);
+                None
             }
         }
     }
 
     pub fn notify(message: String) {
+        info!("Sending desktop notification with content '{}'", &message);
         std::thread::spawn(move || {
             let mut notification_descriptor = NOTIFYICONDATAW {
                 cbSize: std::mem::size_of::<NOTIFYICONDATAW>() as u32,
                 uFlags: shellapi::NIF_INFO | shellapi::NIF_REALTIME | shellapi::NIF_GUID,
                 dwInfoFlags: shellapi::NIIF_NOSOUND,
-                guidItem: generate_guid().expect("Unable to generate a new GUID"),
+                guidItem: generate_guid().unwrap(), // If we failed to create one it is already logged; exit this thread
                 szInfoTitle: encode_string_wide!("CursorSpeedPin", 64),
-                szInfo: encode_string_wide!(message, 256),
+                szInfo: encode_string_wide!(&message, 256),
                 ..Default::default()
             };
+
             let desc = notification_descriptor.borrow_mut();
-            unsafe { Shell_NotifyIconW(shellapi::NIM_ADD, &mut *desc) };
+            let status = unsafe { Shell_NotifyIconW(shellapi::NIM_ADD, &mut *desc) };
+            if status == 0 {
+                error!(
+                    "Failed to send desktop notification, szInfo was '{}'",
+                    &message
+                );
+                return;
+            };
 
             std::thread::sleep(std::time::Duration::from_secs(3));
-            unsafe { Shell_NotifyIconW(shellapi::NIM_DELETE, &mut *desc) };
+            let status = unsafe { Shell_NotifyIconW(shellapi::NIM_DELETE, &mut *desc) };
+            if status == 0 {
+                error!(
+                    "Failed to remove desktop notification, szInfo was '{}'",
+                    &message
+                );
+            };
         });
     }
 
     // Retrieves the currently set mouse speed. Returns a `u8` ranging from 1 to 20.
-    pub fn get_mouse_speed() -> Result<u8> {
+    pub fn get_mouse_speed() -> Option<u8> {
         let mut res = 0;
         let status =
             unsafe { SystemParametersInfoW(SPI_GETMOUSESPEED, 0, &mut res as *mut _ as PVOID, 0) };
-        if status == 1 {
-            Ok(res)
+        if status == 0 {
+            error!("Failed to get mouse speed, return code was {}", status);
+            None
         } else {
-            Err(anyhow!(
-                "Failed to get mouse speed, return code was {}",
-                status
-            ))
+            Some(res)
         }
     }
 
     // Sets the user's mouse speed. Accepts a `u8` ranging from 1 to 20.
     pub fn set_mouse_speed(speed: u8) -> Result<()> {
         let status = unsafe { SystemParametersInfoW(SPI_SETMOUSESPEED, 0, speed as PVOID, 0) };
-        if status == 1 {
-            Ok(())
-        } else {
+        if status == 0 {
             Err(anyhow!(
                 "Failed to set mouse speed, return code was {}",
                 status
             ))
+        } else {
+            Ok(())
         }
     }
 }
