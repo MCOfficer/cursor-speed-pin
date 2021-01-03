@@ -36,8 +36,8 @@ fn main() -> Result<()> {
     DESIRED_SPEED.store(winapi::get_mouse_speed()?, Ordering::SeqCst);
     update_status(&mut tray_icon, &green_icon, &red_icon);
 
-    let checking_thread = std::thread::spawn(|| loop {
-        std::thread::sleep_ms(50);
+    std::thread::spawn(|| loop {
+        std::thread::sleep(std::time::Duration::from_millis(50));
         if ENABLED.load(Ordering::Relaxed) {
             let current = winapi::get_mouse_speed().unwrap();
             let desired = DESIRED_SPEED.load(Ordering::Relaxed);
@@ -54,9 +54,8 @@ fn main() -> Result<()> {
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
 
-        match event {
-            // User events
-            Event::UserEvent(e) => match e {
+        if let Event::UserEvent(e) = event {
+            match e {
                 Events::Exit => *control_flow = ControlFlow::Exit,
                 Events::DoubleClickTrayIcon => {
                     if ENABLED.load(Ordering::Relaxed) {
@@ -67,8 +66,7 @@ fn main() -> Result<()> {
                     }
                     update_status(&mut tray_icon, &green_icon, &red_icon);
                 }
-            },
-            _ => (),
+            }
         }
     });
 }
