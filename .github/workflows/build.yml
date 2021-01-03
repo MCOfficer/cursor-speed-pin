@@ -14,9 +14,7 @@ jobs:
           echo '[target.x86_64-pc-windows-msvc]' >> .cargo/config
           echo 'rustflags = ["-Ctarget-feature=+crt-static"]' >> .cargo/config
       - name: Build binary
-        run: |
-          cargo build --verbose --release
-          mv eslauncher2.exe eslauncher2-x86_64-pc-windows-msvc.exe
+        run: cargo build --verbose --release
       - name: Archive binary
         uses: actions/upload-artifact@v1
         with:
