@@ -75,11 +75,20 @@ fn main() -> Result<()> {
                     let desired = DESIRED_SPEED.load(Ordering::Relaxed);
                     if desired != current {
                         info!("Found speed of {}, resetting to {}", current, desired);
-                        winapi::notify(format!(
-                            "Speed was set to {}, resetting to desired speed {}",
-                            current, desired
-                        ));
-                        winapi::set_mouse_speed(desired).unwrap();
+                        match winapi::set_mouse_speed(desired) {
+                            Ok(_) => {
+                                winapi::notify(format!(
+                                    "Speed was set to {}, resetting to desired speed {}",
+                                    current, desired
+                                ));
+                            }
+                            Err(_) => {
+                                winapi::notify(
+                                    "Failed to set cursor speed, see the log file for more."
+                                        .to_string(),
+                                );
+                            }
+                        };
                     }
                 }
             }
