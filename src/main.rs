@@ -36,8 +36,8 @@ fn main() -> Result<()> {
     let event_loop = EventLoop::<Events>::with_user_event();
     let proxy = event_loop.create_proxy();
 
-    let green = include_bytes!("../green.ico");
-    let red = include_bytes!("../red.ico");
+    let green = include_bytes!("../assets/green.ico");
+    let red = include_bytes!("../assets/red.ico");
     let green_icon = Icon::from_buffer(green, None, None).unwrap();
     let red_icon = Icon::from_buffer(red, None, None).unwrap();
 
