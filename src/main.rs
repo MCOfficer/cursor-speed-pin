@@ -38,14 +38,14 @@ fn main() -> Result<()> {
     let event_loop = EventLoop::<Events>::with_user_event();
     let proxy = event_loop.create_proxy();
 
-    let green = include_bytes!("../assets/green.ico");
-    let red = include_bytes!("../assets/red.ico");
-    let green_icon = Icon::from_buffer(green, None, None).unwrap();
-    let red_icon = Icon::from_buffer(red, None, None).unwrap();
+    let enabled = include_bytes!("../assets/green.ico");
+    let disabled = include_bytes!("../assets/gray.ico");
+    let enabled_icon = Icon::from_buffer(enabled, None, None).unwrap();
+    let disabled_icon = Icon::from_buffer(disabled, None, None).unwrap();
 
     let mut tray_icon = TrayIconBuilder::new()
         .sender_winit(proxy)
-        .icon_from_buffer(red)
+        .icon_from_buffer(disabled)
         .tooltip("Disabled")
         .menu(MenuBuilder::new().item("Exit", Events::Exit))
         .on_double_click(Events::DoubleClickTrayIcon)
@@ -58,7 +58,7 @@ fn main() -> Result<()> {
         Some(speed) => {
             DESIRED_SPEED.store(speed, Ordering::SeqCst);
             info!("Initial status update");
-            update_status(&mut tray_icon, &green_icon, &red_icon);
+            update_status(&mut tray_icon, &enabled_icon, &disabled_icon);
         }
         None => {
             info!("No initial mouse speed, disabling");
@@ -124,14 +124,14 @@ fn main() -> Result<()> {
                             }
                         };
                     }
-                    update_status(&mut tray_icon, &green_icon, &red_icon);
+                    update_status(&mut tray_icon, &enabled_icon, &disabled_icon);
                 }
             }
         }
     });
 }
 
-fn update_status<T>(tray_icon: &mut TrayIcon<T>, green: &Icon, red: &Icon)
+fn update_status<T>(tray_icon: &mut TrayIcon<T>, enabled_icon: &Icon, disabled_icon: &Icon)
 where
     T: PartialEq + Clone + 'static,
 {
@@ -143,13 +143,13 @@ where
                 DESIRED_SPEED.load(Ordering::Relaxed)
             ),
             format!("Enabled, Speed: {}", DESIRED_SPEED.load(Ordering::Relaxed)),
-            green,
+            enabled_icon,
         )
     } else {
         (
             "Unpinned cursor speed".to_string(),
             "Disabled".to_string(),
-            red,
+            disabled_icon,
         )
     };
 
