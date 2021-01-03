@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use anyhow::Result;
 use log::{error, info, LevelFilter};
 use simplelog::*;
