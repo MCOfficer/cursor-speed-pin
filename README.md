@@ -29,3 +29,9 @@ Things aren't working as expected? Please [open an issue](https://github.com/MCO
 If you don't even have a logfile, chances are that you don't have write access to the folder CursorSpeedPin is in; move it to a different folder.
 
 Please be patient with issues, I'm doing this in my free time and it's only one of way too many projects I have going :)
+
+## Acknowledgements
+
+Parts of the code for desktop notifications have been taken from [AmaranthineCodices/win32_notification](https://github.com/AmaranthineCodices/win32_notification), under the same license.
+
+The tray icons are based on [this image](https://pixabay.com/de/vectors/cursor-pfeil-zeiger-computer-maus-23229/) by [Clker-Free-Vector-Images](https://pixabay.com/de/users/clker-free-vector-images-3736/).
