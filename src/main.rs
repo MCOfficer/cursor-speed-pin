@@ -86,7 +86,7 @@ fn main() -> Result<()> {
                             }
                             Err(_) => {
                                 winapi::notify(
-                                    "Failed to set cursor speed, see the log file for more."
+                                    "Failed to set cursor speed, see the logfile for more."
                                         .to_string(),
                                 );
                             }
@@ -210,6 +210,7 @@ mod winapi {
         }
     }
 
+    // Sends a silent desktop notification, then removes it after 3 seconds. `message` should not be longer than 64 characters.
     pub fn notify(message: String) {
         info!("Sending desktop notification with content '{}'", &message);
         std::thread::spawn(move || {
