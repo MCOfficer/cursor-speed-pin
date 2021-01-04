@@ -16,11 +16,11 @@ I hope this is fairly self-explanatory, so here's the short version.
 
 Once you run CursorSpeedPin, it will automatically detect your current cursor speed as set in the control panel. It will give you a nice desktop notification that it is now watching for any changes to that speed, and it will indicate its presence with an icon in the system tray.
 
-Should you want to change your speed (or disable it for some other reason), you can double-click the icon. You will receive a notification, and the icon will also change.
+Should you want to change your speed (or disable it for some other reason), you can double-click the icon. You will receive a notification, and the icon will also change. Repeat that to enable it again.
 
-If CursorSpeedPin detects a change to your cursor speed, it will reset that change and send you a short desktop notification.
+If CursorSpeedPin detects a change to your cursor speed, it will revert that change and send you a short desktop notification.
 
-I would recommend creating an AutoStart entry for CursorSpeedPin, so you don't have to remember to start it. Repeat that to enable it again.
+I would recommend creating an AutoStart entry for CursorSpeedPin, so you don't have to remember to start it.
 
 ## Help it not work
 
