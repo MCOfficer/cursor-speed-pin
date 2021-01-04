@@ -53,15 +53,15 @@ fn main() -> Result<()> {
         .unwrap();
 
     info!("Initialized tray icon");
-    info!("Fetching initial mouse speed");
-    match winapi::get_mouse_speed() {
+    info!("Fetching initial cursor speed");
+    match winapi::get_cursor_speed() {
         Some(speed) => {
             DESIRED_SPEED.store(speed, Ordering::SeqCst);
             info!("Initial status update");
             update_status(&mut tray_icon, &enabled_icon, &disabled_icon);
         }
         None => {
-            info!("No initial mouse speed, disabling");
+            info!("No initial cursor speed, disabling");
             ENABLED.store(false, Ordering::SeqCst);
         }
     }
@@ -73,11 +73,11 @@ fn main() -> Result<()> {
         loop {
             std::thread::sleep(std::time::Duration::from_millis(50));
             if ENABLED.load(Ordering::Relaxed) {
-                if let Some(current) = winapi::get_mouse_speed() {
+                if let Some(current) = winapi::get_cursor_speed() {
                     let desired = DESIRED_SPEED.load(Ordering::Relaxed);
                     if desired != current {
                         info!("Found speed of {}, resetting to {}", current, desired);
-                        match winapi::set_mouse_speed(desired) {
+                        match winapi::set_cursor_speed(desired) {
                             Ok(_) => {
                                 winapi::notify(format!(
                                     "Speed was set to {}, resetting to desired speed {}",
@@ -109,7 +109,7 @@ fn main() -> Result<()> {
                         info!("Disabling");
                         ENABLED.store(false, Ordering::SeqCst);
                     } else {
-                        match winapi::get_mouse_speed() {
+                        match winapi::get_cursor_speed() {
                             Some(speed) => {
                                 info!("Enabling with speed {}", speed);
                                 DESIRED_SPEED.store(speed, Ordering::SeqCst);
@@ -244,25 +244,25 @@ mod winapi {
         });
     }
 
-    // Retrieves the currently set mouse speed. Returns a `u8` ranging from 1 to 20.
-    pub fn get_mouse_speed() -> Option<u8> {
+    // Retrieves the currently set cursor speed. Returns a `u8` ranging from 1 to 20.
+    pub fn get_cursor_speed() -> Option<u8> {
         let mut res = 0;
         let status =
             unsafe { SystemParametersInfoW(SPI_GETMOUSESPEED, 0, &mut res as *mut _ as PVOID, 0) };
         if status == 0 {
-            error!("Failed to get mouse speed, return code was {}", status);
+            error!("Failed to get cursor speed, return code was {}", status);
             None
         } else {
             Some(res)
         }
     }
 
-    // Sets the user's mouse speed. Accepts a `u8` ranging from 1 to 20.
-    pub fn set_mouse_speed(speed: u8) -> Result<()> {
+    // Sets the user's cursor speed. Accepts a `u8` ranging from 1 to 20.
+    pub fn set_cursor_speed(speed: u8) -> Result<()> {
         let status = unsafe { SystemParametersInfoW(SPI_SETMOUSESPEED, 0, speed as PVOID, 0) };
         if status == 0 {
             Err(anyhow!(
-                "Failed to set mouse speed, return code was {}",
+                "Failed to set cursor speed, return code was {}",
                 status
             ))
         } else {
